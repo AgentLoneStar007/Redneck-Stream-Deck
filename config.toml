@@ -1,0 +1,9 @@
+### Configuration for the Redneck Stream Deck
+
+### Possible values:
+### - "debug"
+### - "info"
+### - "warning"
+### - "error"
+### - "fatal"
+logging_level="info"
