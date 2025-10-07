@@ -1,2 +1,4 @@
 evdev
 websockets
+python-dotenv
+pygame

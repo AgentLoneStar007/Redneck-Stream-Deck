@@ -1,21 +1,31 @@
 ## Redneck Stream Deck
 ## A stupid project by AgentLoneStar007
 ## https://github.com/AgentLoneStar007
-
+import os
 # Imports
 import sys
+import tomllib
 import traceback
 import evdev
 from evdev import InputDevice, ecodes
 import asyncio
 import logging
+from dotenv import load_dotenv
 from src.logitech_side_panel import LogitechSidePanel
 from src.logger import configureLogger
 from src.utils import setup
+from src.streamer_bot_ws import StreamerBotWebsocket
+
+# Load the dotenv file
+load_dotenv()
 
 # Variables
 vendor_id: str = "0x16"
 product_id: str = "0x16"
+
+# Dotenv variables
+STREAMER_BOT_ADDRESS: str = os.getenv("STREAMER_BOT_ADDRESS")
+STREAMER_BOT_PORT: int = int(os.getenv("STREAMER_BOT_PORT"))
 
 
 # Function to fetch the device in /dev/input
@@ -39,6 +49,18 @@ async def fetchDevicePath(device_vendor_id: str, device_product_id: str) -> str 
 
 # Main program loop
 async def main() -> None:
+    # Create the connection to Streamer.bot
+    streamer_bot: StreamerBotWebsocket = StreamerBotWebsocket(
+        url=STREAMER_BOT_ADDRESS,
+        port=STREAMER_BOT_PORT
+    )
+    # Connect to it
+    # TODO: This function is blocking. It needs to potentially be set as a background task.
+    ## The websocket can run in the background completely separate from the main loop. It
+    ## simply needs to log errors when it disconnects and when an event is attempted to be
+    ## sent to it but fails to process since there's no active connection.
+    #await streamer_bot.connect()
+
     # Create an object of the Logitech side panel class
     side_panel: LogitechSidePanel = LogitechSidePanel()
 
@@ -123,7 +145,6 @@ if __name__ == "__main__":
 
     except Exception as error:
         log.fatal(f"Process failed with the following error: {error}")
-        print(type(error))
         traceback.print_exc()
 
         # Update the return code

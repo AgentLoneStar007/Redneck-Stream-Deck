@@ -1,3 +1,11 @@
+# Imports
+import asyncio
+import os.path
+from logging import Logger, getLogger
+from src.music_player import MusicPlayer
+import tomllib
+
+
 class LogitechSidePanel:
     def __init__(self) -> None:
         # Create a dictionary containing the names of each button reflecting the key code for said button
@@ -32,67 +40,130 @@ class LogitechSidePanel:
         }
         """The codes for each button with a corresponding button name as a string."""
 
+        # The songs for each corresponding button
+        self.song_mappings: dict[str, str] = {
+            "button_1": "Edvard Grieg  Peer Gynt - Morning Mood.mp3",
+            "button_2": "",
+            "button_3": "",
+            "button_6": "",
+            "button_7": "",
+            "button_8": "",
+            "button_11": "",
+            "button_12": "",
+            "button_13": "",
+            "button_14": "",
+            "button_15": "",
+            "button_16": ""
+        }
+
         # Create a variable showing the current profile
         self.current_profile: int = 0
         """The current profile the side panel is using."""
 
+        # Create the music player library and make it class-accessible
+        self.music_player: MusicPlayer = MusicPlayer()
+
         # Dynamically set the attributes of the class based on the button codes
         for key_code, button_name in self.button_codes.items():
             setattr(self, button_name, key_code)
+
+        # Fetch the config
+        self.config: dict = tomllib.load(open("config.toml", "rb"))
+
+        # Fetch the logger
+        self._log: Logger = getLogger()
+
+        return
+
+    async def _loadSong(self, button_name: str) -> None:
+        # Get the absolute path to the music directory
+        path_to_music_dir: str = os.path.abspath(self.config.get("music_directory", "music/"))
+
+        # Check if the music directory still exists
+        if not os.path.exists(path_to_music_dir):
+            self._log.error("Couldn't find the music directory. Did you delete it, idiot?")
+            return
+
+        # Make sure button_1 is in the song map
+        if button_name not in self.song_mappings:
+            self._log.error(f"\"{button_name}\" isn't mapped to any song, stupid!")
+            return
+
+        # Get the full song path
+        song_path: str = os.path.join(path_to_music_dir, self.song_mappings["button_1"])
+        del path_to_music_dir  # Cleanup
+
+        # Make sure the song is there
+        if not os.path.exists(song_path):
+            self._log.error(
+                f"Couldn't find the song \"{self.song_mappings[button_name]}.\" Maybe try a working file name "
+                "next time?"
+            )
+            return
+
+        # Load the song and play it
+        self.music_player.load(self.song_mappings[button_name])
+        self.music_player.play()
 
         return
 
     async def handleButtonPress(self, code: int) -> None:
         # Path for profile one(or 0)
         if self.current_profile == 0:
+            ## Buttons 1-8: Music
             if code == self.button_1:
-                print("Button 1 pressed")
+                await self._loadSong("button_1")
                 return
             elif code == self.button_2:
-                # Do something
+                await self._loadSong("button_2")
                 return
             elif code == self.button_3:
-                # Do something
+                await self._loadSong("button_3")
                 return
             elif code == self.button_4:
-                # Do something
+                await self._loadSong("button_4")
                 return
             elif code == self.button_5:
-                # Do something
+                await self._loadSong("button_5")
                 return
             elif code == self.button_6:
-                # Do something
+                await self._loadSong("button_6")
                 return
             elif code == self.button_7:
-                # Do something
+                await self._loadSong("button_7")
                 return
             elif code == self.button_8:
-                # Do something
+                await self._loadSong("button_8")
                 return
+
             elif code == self.button_9:
                 # Do something
                 return
+
             elif code == self.button_10:
                 # Do something
                 return
+
+            ## Buttons 11-16: More music
             elif code == self.button_11:
-                # Do something
+                await self._loadSong("button_11")
                 return
             elif code == self.button_12:
-                # Do something
+                await self._loadSong("button_12")
                 return
             elif code == self.button_13:
-                # Do something
+                await self._loadSong("button_14")
                 return
             elif code == self.button_14:
-                # Do something
+                await self._loadSong("button_14")
                 return
             elif code == self.button_15:
-                # Do something
+                await self._loadSong("button_15")
                 return
             elif code == self.button_16:
-                # Do something
+                await self._loadSong("button_16")
                 return
+
             elif code == self.button_17:
                 # Do something
                 return
@@ -108,14 +179,29 @@ class LogitechSidePanel:
             elif code == self.button_21:
                 # Do something
                 return
+            ## Fast-forward music player
             elif code == self.button_22:
-                # Do something
+                if self.music_player.running:
+                    self.music_player.fast_forward(10)
+                else:
+                    self._log.warning("There's no song playing! Can't fast-forward!")
                 return
+            ## Toggle pause on music player
             elif code == self.button_23:
-                # Do something
+                if self.music_player.running:
+                    if self.music_player.paused:
+                        self.music_player.resume()
+                    else:
+                        self.music_player.pause()
+                else:
+                    self._log.warning("There's no song playing! Can't toggle pause!")
                 return
+            ## Rewind music player
             elif code == self.button_24:
-                # Do something
+                if self.music_player.running:
+                    self.music_player.rewind(10)
+                else:
+                    self._log.warning("There's no song playing! Can't rewind!")
                 return
             elif code == self.scroll_wheel_up_26:
                 # Do something

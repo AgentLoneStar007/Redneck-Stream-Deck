@@ -6,4 +6,7 @@
 ### - "warning"
 ### - "error"
 ### - "fatal"
-logging_level="info"
+logging_level = "info"
+
+# The path to the folder where music files are stored
+music_directory = "/home/agent/Desktop/New YouTube Format/Music/Classical/"

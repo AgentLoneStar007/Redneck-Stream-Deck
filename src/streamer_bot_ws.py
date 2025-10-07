@@ -5,6 +5,9 @@ import logging
 from typing import Optional
 from enum import Enum
 import asyncio
+import re
+from urllib.parse import urlparse, ParseResult
+from datetime import datetime
 
 
 # TODO: What's left for this websocket helper:
@@ -14,29 +17,81 @@ import asyncio
 #  - MAKE WEBSOCKET CHILL WITH THE LOGS! Files are already getting huge over just minutes!
 
 class StreamerBotWebsocket:
-    class TwitchEvents(str, Enum):
-        ChatMessage = "ChatMessage"
-        """The ChatMessage event type for the Twitch events sub. Will fire upon chat messages."""
+    class EventTypes:
+        """
+        Event types that can be received from Streamer.bot.
+        This class will contain subclasses for each source,
+        and each source will have it's possible corresponding
+        events.
+        """
+
+        class Twitch(str, Enum):
+            """Events that can be received from Twitch."""
+
+            ChatMessage = "ChatMessage"
+            """Will fire upon chat messages in Twitch chat."""
+
+    class Events:
+        """Events and their data that can be received from Streamer.bot."""
+
+        class Twitch:
+            """Events related to Twitch."""
+
+            class ChatMessage:
+                """A chat message from Twitch and all of its data."""
+
+                message: dict  # Needs custom class
+                user: dict  # Needs custom class
+                messageId: str | None
+                meta: dict  # Needs custom class
+                anonymous: bool
+                text: str | None
+                emotes: list | None
+                parts: list | None
+                isReply: bool
+                reply: dict  # Needs custom class
+                isTest: bool
+                sharedChatSource: dict  # Needs custom class
+                isInSharedChat: bool
+                isSharedChatHost: bool
+                isFromSharedChatGuest: bool
+
 
     def __init__(
             self,
-            url: str,
+            url: str = "127.0.0.1",
             port: int = 8080,
             keep_subscriptions_upon_disconnect: bool = True
     ) -> None:
         """
-        A websocket server for interfacing with Streamer.bot.
-        :param url: The IP address or URL Streamer.bot is at.
+        A websocket client for interfacing with the Streamer.bot Web Socket server.
+
+        :param url: The IP address or URL Streamer.bot is at. You do not have to
+         provide a protocol. If you add one, this will be removed and re-added.
+         For example, use "127.0.0.1" instead of "ws://127.0.0.1."
         :param port: The port that Streamer.bot is listening on.
         :param keep_subscriptions_upon_disconnect: Whether subscriptions should retain across disconnects.
+
         :returns: ``None``
+
         :raises None:
         """
 
         # Make the URL and port class-accessible
         self.url: str = url
         self.port: int = port
-        del url, port  # Cleanup
+
+        # Sanitize the URL by checking if a port or protocol is present,
+        # and remove it if it is
+        if not re.match(r'^\w+://', self.url):
+            self.url = "ws://" + url
+        parsed_url: ParseResult = urlparse(self.url)
+        self.url = parsed_url.hostname or "127.0.0.1"
+
+        # Create a variable to contain whether subscriptions should be kept upon disconnect
+        self._keep_subscriptions: bool = keep_subscriptions_upon_disconnect
+
+        del url, port, parsed_url, keep_subscriptions_upon_disconnect  # Cleanup
 
         # Create the base logger
         self._log: logging.Logger = logging.getLogger()
@@ -56,10 +111,7 @@ class StreamerBotWebsocket:
         # Create a dictionary to store subscriptions in
         self._subscriptions: dict[str, list[str]] = {}
 
-        # Create a variable to contain whether subscriptions should be kept upon disconnect
-        self._keep_subscriptions: bool = keep_subscriptions_upon_disconnect
-
-        # Create an Asyncio lock to prevent issues with the subscriptions list ever accidentally
+        # Create an Asyncio _lock to prevent issues with the subscriptions list ever accidentally
         # getting accessed concurrently
         self._subscriptions_lock: asyncio.Lock = asyncio.Lock()
 
@@ -116,7 +168,7 @@ class StreamerBotWebsocket:
         if (
                 payload.get("event", {}).get("source", "") == "Twitch"
         ) and (
-                payload.get("event", {}).get("type", "") == self.TwitchEvents.ChatMessage
+                payload.get("event", {}).get("type", "") == self.EventTypes.Twitch.ChatMessage
         ):
             self._log.info(
                 f"Received message from {payload["data"]["message"]["displayName"]}: {payload["data"]["message"]["message"]}"
@@ -175,7 +227,7 @@ class StreamerBotWebsocket:
 
     async def subscribe(
             self,
-            twitch: list[TwitchEvents]
+            twitch: list[EventTypes.Twitch]
     ) -> None:
         """
         Subscribe to an event from the Streamer.bot websocket.
@@ -227,7 +279,7 @@ class StreamerBotWebsocket:
     async def unsubscribe(
             self,
             unsubscribe_from_all: bool = False,
-            twitch: list[TwitchEvents] = None
+            twitch: list[EventTypes.Twitch] = None
     ) -> None:
         """
         Unsubscribe from events received from the Streamer.bot websocket.
