@@ -17,6 +17,12 @@ from src.logger import configureLogger
 from src.utils import setup
 from src.streamer_bot_ws import StreamerBotWebsocket
 
+## TODO(s):
+##  - Fix the errors from the Streamer.bot websocket when the program stops.
+##  - Figure out why the logs rotator isn't cleaning out old logs.
+##  - Get the PyGame logger to stop spitting out it's nasty, disgusting hello message.
+##  - Actually become a good programmer (this might be lowkey impossible tho)
+
 # Load the dotenv file
 load_dotenv()
 
@@ -48,6 +54,7 @@ async def fetchDevicePath(device_vendor_id: str, device_product_id: str) -> str 
 # Main program loop
 async def main() -> None:
     # Load the config
+    log.debug("Loading config...")
     config: dict = tomllib.load(open("config.toml", 'rb'))
 
     # Create the connection to Streamer.bot
@@ -56,19 +63,18 @@ async def main() -> None:
         port=STREAMER_BOT_PORT
     )
     # Connect to it
-    # TODO: This function is blocking. It needs to potentially be set as a background task.
-    ## The websocket can run in the background completely separate from the main loop. It
-    ## simply needs to log errors when it disconnects and when an event is attempted to be
-    ## sent to it but fails to process since there's no active connection.
-    #await streamer_bot.connect()
-    #await streamer_bot.get_actions()
+    log.info("Attempting connection to Streamer.bot...")
+    await streamer_bot.connect()
 
     # Create an object of the Logitech side panel class
-    side_panel: LogitechSidePanel = LogitechSidePanel()
+    side_panel: LogitechSidePanel = LogitechSidePanel(
+        streamer_bot_ws_instance=streamer_bot
+    )
+    await side_panel.handleButtonPress(707)
 
     # Handle if the device's vendor ID or product ID are unset
     if not config.get("device_vendor_id") or not config.get("device_product_id"):
-        raise ValueError("You forgot to specify either your device vendor ID or product ID!")
+        raise ValueError("You forgot to specify either your device vendor ID or product ID, dingus!")
 
     while True:
         # Fetch the device's path
@@ -78,7 +84,7 @@ async def main() -> None:
         )
 
         # Open the device
-        device = InputDevice(device_path)
+        device: InputDevice = InputDevice(device_path)
 
         log.info(f"Listening to events from {device_path}...")
         try:

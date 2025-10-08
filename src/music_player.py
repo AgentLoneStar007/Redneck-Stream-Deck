@@ -7,7 +7,10 @@ import time
 import threading
 import os
 
-# TODO: Figure out how to get PyGame to shut up with logs
+## Shoutout to ChatGPT for writing this and saving me
+## like 30-45 minutes of pain.
+## (Also shoutout to me for adding types because we like
+## type safety here.)
 
 
 class MusicPlayer:

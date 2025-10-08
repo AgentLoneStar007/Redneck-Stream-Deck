@@ -4,10 +4,19 @@ import os.path
 from logging import Logger, getLogger
 from src.music_player import MusicPlayer
 import tomllib
+from src.streamer_bot_ws import StreamerBotWebsocket
+from src.notifications import Notifications
 
 
 class LogitechSidePanel:
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            streamer_bot_ws_instance: StreamerBotWebsocket
+    ) -> None:
+        # Make the Streamer.bot websocket client class-accessible
+        self.streamer_bot: StreamerBotWebsocket = streamer_bot_ws_instance
+        del streamer_bot_ws_instance  # Cleanup
+
         # Create a dictionary containing the names of each button reflecting the key code for said button
         self.button_codes: dict = {
             304: "button_1",
@@ -40,28 +49,46 @@ class LogitechSidePanel:
         }
         """The codes for each button with a corresponding button name as a string."""
 
+        # Create a dictionary containing names for the profiles
+        ## This also acts as a reference for valid profiles.
+        self.profile_names: dict = {
+            0: "Main",
+            1: "More Music"
+        }
+
         # The songs for each corresponding button
-        self.song_mappings: dict[str, str] = {
-            "button_1": "M4G1C DR34MS.mp3",
-            "button_2": "Stray - Main Menu Theme - OST Soundtrack #stray #straygame.mp3",
-            "button_3": "Mass Effect Trilogy - Extended Galaxy Map Theme (HD).mp3",
-            "button_6": "TES V Skyrim Soundtrack - The Streets of Whiterun.mp3",
-            "button_7": "Gran Turismo 5 Soundtrack feels so good - KEMMEI ADACHI (Lounge Music).mp3",
-            "button_8": "Scheming Through The Zombie Apocalypse   Main Music.mp3",
-            "button_11": "Grab a Cab.mp3",
-            "button_12": "Team Fortress 2 Soundtrack   Red Bread.mp3",
-            "button_13": "Punch-Out Wii Theme.mp3",
-            "button_14": "il vento d'oro.mp3",
-            "button_15": "Pepsiman Pepsiman Pepsiman   Pepsiman Remix.mp3",
-            "button_16": "PIZZA TOWER - It's Pizza Time! (METAL COVER by RichaadEB).mp3"
+        self.song_mappings: dict = {
+            0: {
+                "button_1": "M4G1C DR34MS.mp3",
+                "button_2": "Stray - Main Menu Theme - OST Soundtrack #stray #straygame.mp3",
+                "button_3": "Mass Effect Trilogy - Extended Galaxy Map Theme (HD).mp3",
+                "button_6": "TES V Skyrim Soundtrack - The Streets of Whiterun.mp3",
+                "button_7": "Gran Turismo 5 Soundtrack feels so good - KEMMEI ADACHI (Lounge Music).mp3",
+                "button_8": "Scheming Through The Zombie Apocalypse   Main Music.mp3",
+                "button_11": "Grab a Cab.mp3",
+                "button_12": "Team Fortress 2 Soundtrack   Red Bread.mp3",
+                "button_13": "Punch-Out Wii Theme.mp3",
+                "button_14": "il vento d'oro.mp3",
+                "button_15": "Pepsiman Pepsiman Pepsiman   Pepsiman Remix.mp3",
+                "button_16": "PIZZA TOWER - It's Pizza Time! (METAL COVER by RichaadEB).mp3"
+            }
         }
 
         # Create a variable showing the current profile
         self.current_profile: int = 0
         """The current profile the side panel is using."""
 
+        # Create a variable to store the ID of the last made notification
+        self._last_notification_id: int | None = None
+
         # Create the music player library and make it class-accessible
         self.music_player: MusicPlayer = MusicPlayer()
+
+        # Create the notifications object and make it class-accessible
+        self.notifications: Notifications = Notifications(
+            app_name="Redneck Stream Deck",
+            app_icon_path="assets/app_icon.png"
+        )
 
         # Dynamically set the attributes of the class based on the button codes
         for key_code, button_name in self.button_codes.items():
@@ -84,23 +111,27 @@ class LogitechSidePanel:
             self._log.error("Couldn't find the music directory. Did you delete it, idiot?")
             return
 
+        # Get the song mappings for the current profile
+        song_mappings_dict: dict = self.song_mappings[self.current_profile]
+
         # Make sure button_1 is in the song map
-        if button_name not in self.song_mappings:
+        if button_name not in song_mappings_dict:
             self._log.error(f"\"{button_name}\" isn't mapped to any song, stupid!")
             return
 
-        if not self.song_mappings[button_name]:
+        # Make sure there's a song linked to the button
+        if not song_mappings_dict[button_name]:
             self._log.error(f"\"{button_name}\" doesn't have an assigned song, retard!")
             return
 
         # Get the full song path
-        song_path: str = os.path.join(path_to_music_dir, self.song_mappings[button_name])
+        song_path: str = os.path.join(path_to_music_dir, song_mappings_dict[button_name])
         del path_to_music_dir  # Cleanup
 
         # Make sure the song is there
         if not os.path.exists(song_path):
             self._log.error(
-                f"Couldn't find the song \"{self.song_mappings[button_name]}.\" Maybe try a working file name "
+                f"Couldn't find the song \"{song_mappings_dict[button_name]}.\" Maybe try a working file name "
                 "next time?"
             )
             return
@@ -108,12 +139,87 @@ class LogitechSidePanel:
         # Load the song and play it
         self.music_player.load(song_path)
         self.music_player.play()
-        self._log.debug(f"Now playing \"{self.song_mappings[button_name]}.\"")
+        self._log.debug(f"Now playing \"{song_mappings_dict[button_name]}.\"")
 
         return
 
     async def handleButtonPress(self, code: int) -> None:
         self._log.debug(f"Processing event code {code}...")
+
+        # Persistent buttons (buttons that are the same across profiles
+        ## Cycle profile down
+        if code == self.button_19:
+            if len(self.profile_names) <= 1:
+                self._log.warning("Attempted to switch profiles, but there is only profile to choose from!")
+                self._last_notification_id = await self.notifications.createNotification(
+                    message="There is only one profile to select from!",
+                    title="Profiles Error",
+                    notification_id=self._last_notification_id
+                )
+
+                return
+
+            self._log.debug(f"Old profile ID: {self.current_profile}")
+            # Create a list of profile IDs
+            profiles_ids: list[int] = [profile_id for profile_id in self.profile_names]
+
+            # If the current profile is the first in the list, wrap around to the last one
+            if (self.current_profile + 1) < len(profiles_ids):
+                self.current_profile = profiles_ids[-1]
+            # Otherwise, decrement the ID of the profile
+            else:
+                self.current_profile -= 1
+            self._log.debug(f"New profile ID: {self.current_profile}")
+
+            # Get the profile's name, handling if it doesn't have one assigned
+            profile_name: str = f"profile_{self.current_profile}" if (self.current_profile not in self.profile_names
+                                                                      ) else self.profile_names[self.current_profile]
+
+            # Notify the user of the change
+            self._last_notification_id = await self.notifications.createNotification(
+                message=f"Switched to profile {profile_name}.",
+                title="Profile Change",
+                notification_id=self._last_notification_id
+            )
+
+            return
+
+        ## Cycle profile up
+        elif code == self.button_20:
+            if len(self.profile_names) <= 1:
+                self._log.warning("Attempted to switch profiles, but there is only profile to choose from!")
+                self._last_notification_id = await self.notifications.createNotification(
+                    message="There is only one profile to select from!",
+                    title="Profiles Error",
+                    notification_id=self._last_notification_id
+                )
+
+                return
+
+            self._log.debug(f"Old profile ID: {self.current_profile}")
+            # Create a list of profile IDs
+            profiles_ids: list[int] = [profile_id for profile_id in self.profile_names]
+
+            # If the current profile is the last in the list, wrap around to the first one
+            if (self.current_profile + 1) >= len(profiles_ids):
+                self.current_profile = 0
+            # Otherwise, increment the ID of the profile
+            else:
+                self.current_profile += 1
+            self._log.debug(f"New profile ID: {self.current_profile}")
+
+            # Get the profile's name, handling if it doesn't have one assigned
+            profile_name: str = f"profile_{self.current_profile}" if (self.current_profile not in self.profile_names
+                                                                      ) else self.profile_names[self.current_profile]
+
+            # Notify the user of the change
+            self._last_notification_id = await self.notifications.createNotification(
+                message=f"Switched to profile {profile_name}.",
+                title="Profile Change",
+                notification_id=self._last_notification_id
+            )
+
+            return
 
         # Path for profile one(or 0)
         if self.current_profile == 0:
@@ -177,12 +283,7 @@ class LogitechSidePanel:
             elif code == self.button_18:
                 # Do something
                 return
-            elif code == self.button_19:
-                # Do something
-                return
-            elif code == self.button_20:
-                # Do something
-                return
+            ## Buttons 19 and 20 are for cycling profiles
             elif code == self.button_21:
                 # Do something
                 return
@@ -220,11 +321,15 @@ class LogitechSidePanel:
                 # Do something
                 return
             else:
-                # Handle an unrecognized keycode (this shouldn't ever happen)
-                print(f"Unrecognized code: {code}")
+                # Handle an unrecognized keycode
+                print(f"Unrecognized key code \"{code}!\"")
                 return
         
-        # Add more profiles as necessary
+        ## Add more profiles as necessary
+
+        # Handle if the current profile isn't present
+        else:
+            self._log.error("The current profile is unrecognized!")
 
         return
 

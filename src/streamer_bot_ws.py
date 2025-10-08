@@ -197,6 +197,8 @@ class StreamerBotWebsocket:
                     # Port
                     f":{self.port}"
                 )
+                # Grab the hello message to prevent conflict with any other methods
+                await self._websocket.recv()
                 self._log.info("Connected to Streamer.bot.")
 
                 # Resubscribe to previous subscriptions
@@ -374,10 +376,17 @@ class StreamerBotWebsocket:
 
     async def get_actions(self) -> dict:
         """
-        Gets all actions in Streamer.bot.
+        Gets all available actions in Streamer.bot.
 
-        :return:
+        :returns:  ``dict`` - The dictionary containing all present
+         actions in the Streamer.bot instance. You can go to this
+         website, https://docs.streamer.bot/api/servers/websocket/requests/#getactions,
+         to see what the dictionary contains because I'm too lazy to
+         create custom types or document this garbage.
+
+        :raises ConnectionError: If the websocket isn't currently connected.
         """
+
         # Handle if the websocket isn't connected
         if not self._websocket:
             raise ConnectionError("Websocket is not connected!")
@@ -391,55 +400,61 @@ class StreamerBotWebsocket:
         # Send the payload
         self._log.debug("Attempting to get all actions in Streamer.bot...")
         await self._websocket.send(json.dumps(payload))
-        self._log.debug("Request completed.")
+        self._log.debug("Waiting for response...")
+        response: bytes = await self._websocket.recv()
+        self._log.debug("Response received.")
 
-        return {}
+        # Clean up and remove unneeded data
+        response_dict: dict = json.loads(response)
+        del response_dict["id"], response_dict["status"], response
 
-    # TODO: This function still isn't done. Finish it.
+        # Return the responded list of actions
+        return response_dict
+
     async def do_action(
             self,
-            action_id: str,
+            action_id: str = None,
             action_name: str = None,
             args: dict = None
-    ) -> None:
+    ) -> dict:
         """
         Perform an action in Streamer.bot.
 
         :param action_id: The action's ID. Can be acquired from the
-         get_actions() method.
-        :param action_name: The action's name.
+         get_actions() method. If ID is provided, do not provide the
+         action name; it will be ignored.
+        :param action_name: The action's name. If name is provided,
+         do not provide the action ID as well; it will be ignored.
         :param args: Any arguments to pass to the action, in the
          form of a dictionary.
 
-        :returns: ``None``
+        :returns: ``dict`` - The response data from Streamer.bot. Go read
+         https://docs.streamer.bot/api/servers/websocket/requests/#doaction
+         for more info because I'm lazy.
 
-        :raises None:
+        :raises ValueError: If neither action name nor action ID was
+         provided.
+        :raises ConnectionError: If the websocket isn't currently connected.
         """
+
+        # Handle if required arguments weren't provided
+        if not any({action_name, action_id}):
+            raise ValueError("Neither action_name nor action_id was provided!")
+
         # Handle if the websocket isn't connected
         if not self._websocket:
             raise ConnectionError("Websocket is not connected!")
 
-        ## Don't judge me. I'm tired.
-        if action_name and action_id:
+        # Create the payload provided on what arguments were provided
+        if action_name:
             # Create the payload to send
             payload: dict = {
               "request": "DoAction",
               "action": {
-                "id": action_id,
                 "name": action_name
               },
               "args": args,
               "id": str(uuid.uuid1())
-            }
-        elif action_name:
-            # Create the payload to send
-            payload: dict = {
-                "request": "DoAction",
-                "action": {
-                    "name": action_name
-                },
-                "args": args,
-                "id": str(uuid.uuid1())
             }
         else:
             # Create the payload to send
@@ -455,6 +470,15 @@ class StreamerBotWebsocket:
         # Send the payload
         self._log.debug("Attempting to perform an action in Streamer.bot...")
         await self._websocket.send(json.dumps(payload))
-        self._log.debug("Action completed.")
+        self._log.debug("Waiting for response...")
+        response: bytes = await self._websocket.recv()
+        self._log.debug("Response received.")
 
-        return
+        # Clean up and remove unneeded data
+        response_dict: dict = json.loads(response)
+        ## Why properly handle if values are not present when you could just pray that
+        ## they're there?
+        del response, response_dict["status"], response_dict["id"]
+
+        # Return the responded list of actions
+        return response_dict
