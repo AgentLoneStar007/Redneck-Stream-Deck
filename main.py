@@ -1,9 +1,10 @@
 ## Redneck Stream Deck
 ## A stupid project by AgentLoneStar007
 ## https://github.com/AgentLoneStar007
-import os
+
 # Imports
 import sys
+import os
 import tomllib
 import traceback
 import evdev
@@ -19,9 +20,6 @@ from src.streamer_bot_ws import StreamerBotWebsocket
 # Load the dotenv file
 load_dotenv()
 
-# Variables
-vendor_id: str = "0x16"
-product_id: str = "0x16"
 
 # Dotenv variables
 STREAMER_BOT_ADDRESS: str = os.getenv("STREAMER_BOT_ADDRESS")
@@ -49,6 +47,9 @@ async def fetchDevicePath(device_vendor_id: str, device_product_id: str) -> str 
 
 # Main program loop
 async def main() -> None:
+    # Load the config
+    config: dict = tomllib.load(open("config.toml", 'rb'))
+
     # Create the connection to Streamer.bot
     streamer_bot: StreamerBotWebsocket = StreamerBotWebsocket(
         url=STREAMER_BOT_ADDRESS,
@@ -60,13 +61,21 @@ async def main() -> None:
     ## simply needs to log errors when it disconnects and when an event is attempted to be
     ## sent to it but fails to process since there's no active connection.
     #await streamer_bot.connect()
+    #await streamer_bot.get_actions()
 
     # Create an object of the Logitech side panel class
     side_panel: LogitechSidePanel = LogitechSidePanel()
 
+    # Handle if the device's vendor ID or product ID are unset
+    if not config.get("device_vendor_id") or not config.get("device_product_id"):
+        raise ValueError("You forgot to specify either your device vendor ID or product ID!")
+
     while True:
         # Fetch the device's path
-        device_path: str = await fetchDevicePath(device_vendor_id=vendor_id, device_product_id=product_id)
+        device_path: str = await fetchDevicePath(
+            device_vendor_id=config.get("device_vendor_id"),
+            device_product_id=config.get("device_product_id")
+        )
 
         # Open the device
         device = InputDevice(device_path)

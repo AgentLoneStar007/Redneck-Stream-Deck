@@ -1,5 +1,16 @@
 ### Configuration for the Redneck Stream Deck
 
+# Device info
+## Aquire from the "lsusb" command
+device_vendor_id = "0738"
+device_product_id = "2218"
+
+# The path to the folder where music files are stored
+music_directory = "/home/agent/Music/Stream Music/"
+
+# Volume of music tracks played. Max is 1.
+music_volume = 0.4
+
 ### Possible values:
 ### - "debug"
 ### - "info"
@@ -7,6 +18,3 @@
 ### - "error"
 ### - "fatal"
 logging_level = "info"
-
-# The path to the folder where music files are stored
-music_directory = "/home/agent/Desktop/New YouTube Format/Music/Classical/"

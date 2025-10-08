@@ -1,11 +1,14 @@
 # Imports
 import logging
+import tomllib
+
 import pygame
 import time
 import threading
 import os
 
 # TODO: Figure out how to get PyGame to shut up with logs
+
 
 class MusicPlayer:
     def __init__(self):
@@ -15,6 +18,7 @@ class MusicPlayer:
         # Create some class vars
         self._lock: threading.Lock = threading.Lock()
         self._updater_thread = None
+        self._config: dict = tomllib.load(open("config.toml", 'rb'))
 
         # Fetch the logger
         self._log: logging.Logger = logging.getLogger()
@@ -35,7 +39,7 @@ class MusicPlayer:
             self.file = filepath
             self.length = pygame.mixer.Sound(filepath).get_length()
             self.current_time = 0
-            self._log.debug(f"Playing file \"{filepath}.\" Length: {self.length:.2f}s")
+            self._log.debug(f"Loaded file \"{filepath}.\" Length: {self.length:.2f}s")
 
     def _update_time(self) -> None:
         """Track playback time in a separate thread."""
@@ -62,6 +66,7 @@ class MusicPlayer:
 
         # Start playing the song
         pygame.mixer.music.play(start=self.current_time)
+        pygame.mixer.music.set_volume(self._config.get("music_volume", 0.4))
 
         # Update the paused variable
         self.paused = False
@@ -70,7 +75,6 @@ class MusicPlayer:
         if not self._updater_thread or not self._updater_thread.is_alive():
             self._updater_thread = threading.Thread(target=self._update_time, daemon=True)
             self._updater_thread.start()
-        self._log.debug("Started playing a new song.")
 
         return
 

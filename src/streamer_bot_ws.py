@@ -8,6 +8,7 @@ import asyncio
 import re
 from urllib.parse import urlparse, ParseResult
 from datetime import datetime
+import uuid
 
 
 # TODO: What's left for this websocket helper:
@@ -55,7 +56,6 @@ class StreamerBotWebsocket:
                 isInSharedChat: bool
                 isSharedChatHost: bool
                 isFromSharedChatGuest: bool
-
 
     def __init__(
             self,
@@ -164,6 +164,8 @@ class StreamerBotWebsocket:
     async def _handle_event(self, payload: dict):
         """Process data from the websocket."""
 
+        self._log.debug(f"event: {payload}")
+
         ## Processor for Twitch chat messages
         if (
                 payload.get("event", {}).get("source", "") == "Twitch"
@@ -221,7 +223,10 @@ class StreamerBotWebsocket:
             # TODO: Maybe add a different handler for critical errors and non-critical errors
             except Exception as error:
                 # TODO: Implement a back-off system!
-                self._log.error(f"The following error occurred in the Streamer.bot connection: {error}.")
+                self._log.error(
+                    f"The following error occurred in the Streamer.bot connection: {error}. Retrying in 3 seconds."
+                )
+                await asyncio.sleep(3)
 
         return
 
@@ -235,7 +240,9 @@ class StreamerBotWebsocket:
         # Subscribe to Twitch chat messages
         await websocket.subscribe(twitch=websocket.TwitchEvents.ChatMessage)
         :param twitch: All Twitch-related events to subscribe to.
+
         :returns: ``None``
+
         :raises ConnectionError: If the websocket is not connected.
         """
 
@@ -291,7 +298,9 @@ class StreamerBotWebsocket:
         :param unsubscribe_from_all: A boolean value that, if set to true,
          will unsubscribe from all other arguments. Default is false.
         :param twitch: All Twitch-related events to unsubscribe from.
+
         :returns: ``None``
+
         :raises ConnectionError: If the websocket is not connected.
         """
 
@@ -360,5 +369,92 @@ class StreamerBotWebsocket:
             self._websocket = None
 
         self._log.debug("Closed connection to Streamer.bot.")
+
+        return
+
+    async def get_actions(self) -> dict:
+        """
+        Gets all actions in Streamer.bot.
+
+        :return:
+        """
+        # Handle if the websocket isn't connected
+        if not self._websocket:
+            raise ConnectionError("Websocket is not connected!")
+
+        # Create the payload
+        payload: dict = {
+          "request": "GetActions",
+          "id": str(uuid.uuid1())
+        }
+
+        # Send the payload
+        self._log.debug("Attempting to get all actions in Streamer.bot...")
+        await self._websocket.send(json.dumps(payload))
+        self._log.debug("Request completed.")
+
+        return {}
+
+    # TODO: This function still isn't done. Finish it.
+    async def do_action(
+            self,
+            action_id: str,
+            action_name: str = None,
+            args: dict = None
+    ) -> None:
+        """
+        Perform an action in Streamer.bot.
+
+        :param action_id: The action's ID. Can be acquired from the
+         get_actions() method.
+        :param action_name: The action's name.
+        :param args: Any arguments to pass to the action, in the
+         form of a dictionary.
+
+        :returns: ``None``
+
+        :raises None:
+        """
+        # Handle if the websocket isn't connected
+        if not self._websocket:
+            raise ConnectionError("Websocket is not connected!")
+
+        ## Don't judge me. I'm tired.
+        if action_name and action_id:
+            # Create the payload to send
+            payload: dict = {
+              "request": "DoAction",
+              "action": {
+                "id": action_id,
+                "name": action_name
+              },
+              "args": args,
+              "id": str(uuid.uuid1())
+            }
+        elif action_name:
+            # Create the payload to send
+            payload: dict = {
+                "request": "DoAction",
+                "action": {
+                    "name": action_name
+                },
+                "args": args,
+                "id": str(uuid.uuid1())
+            }
+        else:
+            # Create the payload to send
+            payload: dict = {
+                "request": "DoAction",
+                "action": {
+                    "id": action_id,
+                },
+                "args": args,
+                "id": str(uuid.uuid1())
+            }
+
+        # Send the payload
+        self._log.debug("Attempting to perform an action in Streamer.bot...")
+        await self._websocket.send(json.dumps(payload))
+        self._log.debug("Action completed.")
 
         return

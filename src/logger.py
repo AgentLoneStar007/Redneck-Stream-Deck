@@ -82,6 +82,7 @@ class StreamHandler(logging.StreamHandler):
 
         return
 
+
 # A custom formatter class that adds colors to logs depending on their type
 class Formatter(logging.Formatter):
     log_colors: dict = {

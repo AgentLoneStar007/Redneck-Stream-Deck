@@ -42,18 +42,18 @@ class LogitechSidePanel:
 
         # The songs for each corresponding button
         self.song_mappings: dict[str, str] = {
-            "button_1": "Edvard Grieg  Peer Gynt - Morning Mood.mp3",
-            "button_2": "",
-            "button_3": "",
-            "button_6": "",
-            "button_7": "",
-            "button_8": "",
-            "button_11": "",
-            "button_12": "",
-            "button_13": "",
-            "button_14": "",
-            "button_15": "",
-            "button_16": ""
+            "button_1": "M4G1C DR34MS.mp3",
+            "button_2": "Stray - Main Menu Theme - OST Soundtrack #stray #straygame.mp3",
+            "button_3": "Mass Effect Trilogy - Extended Galaxy Map Theme (HD).mp3",
+            "button_6": "TES V Skyrim Soundtrack - The Streets of Whiterun.mp3",
+            "button_7": "Gran Turismo 5 Soundtrack feels so good - KEMMEI ADACHI (Lounge Music).mp3",
+            "button_8": "Scheming Through The Zombie Apocalypse   Main Music.mp3",
+            "button_11": "Grab a Cab.mp3",
+            "button_12": "Team Fortress 2 Soundtrack   Red Bread.mp3",
+            "button_13": "Punch-Out Wii Theme.mp3",
+            "button_14": "il vento d'oro.mp3",
+            "button_15": "Pepsiman Pepsiman Pepsiman   Pepsiman Remix.mp3",
+            "button_16": "PIZZA TOWER - It's Pizza Time! (METAL COVER by RichaadEB).mp3"
         }
 
         # Create a variable showing the current profile
@@ -89,8 +89,12 @@ class LogitechSidePanel:
             self._log.error(f"\"{button_name}\" isn't mapped to any song, stupid!")
             return
 
+        if not self.song_mappings[button_name]:
+            self._log.error(f"\"{button_name}\" doesn't have an assigned song, retard!")
+            return
+
         # Get the full song path
-        song_path: str = os.path.join(path_to_music_dir, self.song_mappings["button_1"])
+        song_path: str = os.path.join(path_to_music_dir, self.song_mappings[button_name])
         del path_to_music_dir  # Cleanup
 
         # Make sure the song is there
@@ -102,12 +106,15 @@ class LogitechSidePanel:
             return
 
         # Load the song and play it
-        self.music_player.load(self.song_mappings[button_name])
+        self.music_player.load(song_path)
         self.music_player.play()
+        self._log.debug(f"Now playing \"{self.song_mappings[button_name]}.\"")
 
         return
 
     async def handleButtonPress(self, code: int) -> None:
+        self._log.debug(f"Processing event code {code}...")
+
         # Path for profile one(or 0)
         if self.current_profile == 0:
             ## Buttons 1-8: Music
@@ -152,7 +159,7 @@ class LogitechSidePanel:
                 await self._loadSong("button_12")
                 return
             elif code == self.button_13:
-                await self._loadSong("button_14")
+                await self._loadSong("button_13")
                 return
             elif code == self.button_14:
                 await self._loadSong("button_14")
