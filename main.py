@@ -57,6 +57,10 @@ async def main() -> None:
     log.debug("Loading config...")
     config: dict = tomllib.load(open("config.toml", 'rb'))
 
+    # Handle if the device's vendor ID or product ID are unset
+    if not config.get("device_vendor_id") or not config.get("device_product_id"):
+        raise ValueError("You forgot to specify either your device vendor ID or product ID, dingus!")
+
     # Create the connection to Streamer.bot
     streamer_bot: StreamerBotWebsocket = StreamerBotWebsocket(
         url=STREAMER_BOT_ADDRESS,
@@ -70,11 +74,6 @@ async def main() -> None:
     side_panel: LogitechSidePanel = LogitechSidePanel(
         streamer_bot_ws_instance=streamer_bot
     )
-    await side_panel.handleButtonPress(707)
-
-    # Handle if the device's vendor ID or product ID are unset
-    if not config.get("device_vendor_id") or not config.get("device_product_id"):
-        raise ValueError("You forgot to specify either your device vendor ID or product ID, dingus!")
 
     while True:
         # Fetch the device's path

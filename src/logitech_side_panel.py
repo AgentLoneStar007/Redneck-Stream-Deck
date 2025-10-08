@@ -53,7 +53,7 @@ class LogitechSidePanel:
         ## This also acts as a reference for valid profiles.
         self.profile_names: dict = {
             0: "Main",
-            1: "More Music"
+            1: "Oops! All Music!"
         }
 
         # The songs for each corresponding button
@@ -71,6 +71,9 @@ class LogitechSidePanel:
                 "button_14": "il vento d'oro.mp3",
                 "button_15": "Pepsiman Pepsiman Pepsiman   Pepsiman Remix.mp3",
                 "button_16": "PIZZA TOWER - It's Pizza Time! (METAL COVER by RichaadEB).mp3"
+            },
+            1: {
+
             }
         }
 
@@ -142,6 +145,22 @@ class LogitechSidePanel:
         self._log.debug(f"Now playing \"{song_mappings_dict[button_name]}.\"")
 
         return
+
+    async def _verifyActionExistence(self, action_name: str) -> bool:
+        # Fetch available actions from Streamer.bot
+        actions: dict = await self.streamer_bot.get_actions()
+
+        # Get all action names
+        action_names: list[str] = [action["name"].lower() for action in actions["actions"]]
+        del actions  # Cleanup
+
+        # Handle if the required action isn't present
+        if action_name.lower() not in action_names:
+            self._log.error(f"Couldn't find corresponding action \"{action_name}\" in Streamer.bot!")
+
+            return False
+
+        return True
 
     async def handleButtonPress(self, code: int) -> None:
         self._log.debug(f"Processing event code {code}...")
@@ -223,7 +242,7 @@ class LogitechSidePanel:
 
         # Path for profile one(or 0)
         if self.current_profile == 0:
-            ## Buttons 1-8: Music
+            ## Buttons 1-3: Music
             if code == self.button_1:
                 await self._loadSong("button_1")
                 return
@@ -233,12 +252,44 @@ class LogitechSidePanel:
             elif code == self.button_3:
                 await self._loadSong("button_3")
                 return
+
+            ## Buttons 4-5: Scene switching
             elif code == self.button_4:
-                await self._loadSong("button_4")
+                # Make a variable for the action name in Streamer.bot
+                streamer_bot_action_name: str = "obs change scene"
+
+                # Handle if it doesn't exist
+                if not await self._verifyActionExistence(streamer_bot_action_name):
+                    return
+
+                # Run the action to toggle the desktop audio
+                await self.streamer_bot.do_action(
+                    action_name=streamer_bot_action_name,
+                    args={
+                        "scene_name": "Starting Soon"
+                    }
+                )
+
                 return
             elif code == self.button_5:
-                await self._loadSong("button_5")
+                # Make a variable for the action name in Streamer.bot
+                streamer_bot_action_name: str = "obs change scene"
+
+                # Handle if it doesn't exist
+                if not await self._verifyActionExistence(streamer_bot_action_name):
+                    return
+
+                # Run the action to toggle the desktop audio
+                await self.streamer_bot.do_action(
+                    action_name=streamer_bot_action_name,
+                    args={
+                        "scene_name": "Game"
+                    }
+                )
+
                 return
+
+            ## Buttons 6-8: More music
             elif code == self.button_6:
                 await self._loadSong("button_6")
                 return
@@ -249,15 +300,43 @@ class LogitechSidePanel:
                 await self._loadSong("button_8")
                 return
 
+            ## Buttons 9-10: More scene switching
             elif code == self.button_9:
-                # Do something
-                return
+                # Make a variable for the action name in Streamer.bot
+                streamer_bot_action_name: str = "obs change scene"
 
+                # Handle if it doesn't exist
+                if not await self._verifyActionExistence(streamer_bot_action_name):
+                    return
+
+                # Run the action to toggle the desktop audio
+                await self.streamer_bot.do_action(
+                    action_name=streamer_bot_action_name,
+                    args={
+                        "scene_name": "Back Soon"
+                    }
+                )
+
+                return
             elif code == self.button_10:
-                # Do something
+                # Make a variable for the action name in Streamer.bot
+                streamer_bot_action_name: str = "obs change scene"
+
+                # Handle if it doesn't exist
+                if not await self._verifyActionExistence(streamer_bot_action_name):
+                    return
+
+                # Run the action to toggle the desktop audio
+                await self.streamer_bot.do_action(
+                    action_name=streamer_bot_action_name,
+                    args={
+                        "scene_name": "Technical Difficulties"
+                    }
+                )
+
                 return
 
-            ## Buttons 11-16: More music
+            ## Buttons 11-16: Even more music
             elif code == self.button_11:
                 await self._loadSong("button_11")
                 return
@@ -277,12 +356,38 @@ class LogitechSidePanel:
                 await self._loadSong("button_16")
                 return
 
+            ## Toggle desktop audio
             elif code == self.button_17:
-                # Do something
+                # Make a variable for the action name in Streamer.bot
+                streamer_bot_action_name: str = "obs toggle desktop audio"
+
+                # Handle if it doesn't exist
+                if not await self._verifyActionExistence(streamer_bot_action_name):
+                    return
+
+                # Run the action to toggle the desktop audio
+                await self.streamer_bot.do_action(
+                    action_name=streamer_bot_action_name
+                )
+
                 return
+
+            ## Toggle mic
             elif code == self.button_18:
-                # Do something
+                # Make a variable for the action name in Streamer.bot
+                streamer_bot_action_name: str = "obs toggle mic"
+
+                # Handle if it doesn't exist
+                if not await self._verifyActionExistence(streamer_bot_action_name):
+                    return
+
+                # Run the action to toggle the desktop audio
+                await self.streamer_bot.do_action(
+                    action_name=streamer_bot_action_name
+                )
+
                 return
+
             ## Buttons 19 and 20 are for cycling profiles
             elif code == self.button_21:
                 # Do something
